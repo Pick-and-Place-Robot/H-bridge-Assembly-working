@@ -8,7 +8,6 @@ This project involves the design and implementation of a pick-and-place robot ar
 - **Stepper Motors:** 4 stepper motors with drivers
 - **LCD:** I2C LCD (16x2)
 - **Push Buttons:** 5 buttons for navigation and immediate stop
-- **Power Supply:** Appropriate power supply for the stepper motors and microcontroller
 
 ## Software Setup
 
@@ -25,23 +24,38 @@ This project involves the design and implementation of a pick-and-place robot ar
 ### Pin Definitions
 
 ```cpp
-#define DIR_PIN1 3
-#define STEP_PIN1 2
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/eeprom.h>
 
-#define DIR_PIN2 5
-#define STEP_PIN2 4
+#define F_CPU 16000000UL
 
-#define DIR_PIN3 7
-#define STEP_PIN3 6
+#define DIR1_PORT PORTD
+#define DIR1_PIN PD3
+#define STEP1_PORT PORTD
+#define STEP1_PIN PD2
 
-#define DIR_PIN4 9
-#define STEP_PIN4 8
+#define DIR2_PORT PORTD
+#define DIR2_PIN PD5
+#define STEP2_PORT PORTD
+#define STEP2_PIN PD4
 
-#define UP_PIN 11
-#define DOWN_PIN 12
-#define MENU_PIN 10
-#define CANCEL_PIN 13
-#define IMMEDIATE_PIN A0
+#define DIR3_PORT PORTD
+#define DIR3_PIN PD7
+#define STEP3_PORT PORTD
+#define STEP3_PIN PD6
+
+#define DIR4_PORT PORTB
+#define DIR4_PIN PB1
+#define STEP4_PORT PORTB
+#define STEP4_PIN PB0
+
+#define UP_BUTTON_PIN PC0
+#define DOWN_BUTTON_PIN PC1
+#define MENU_BUTTON_PIN PC2
+#define CANCEL_BUTTON_PIN PC3
+#define IMMEDIATE_BUTTON_PIN PC4
+
 ```
 
 These definitions set the pin numbers for the stepper motors and push buttons.
@@ -61,8 +75,6 @@ void setupStepperPins() {
 ### EEPROM Setup
 ```cpp
 
-#include <avr/eeprom.h>
-
 uint16_t eepromAddr_stepper1 = 0;
 uint16_t eepromAddr_stepper2 = 2;
 uint16_t eepromAddr_stepper3 = 4;
@@ -73,7 +85,7 @@ int16_t savedPosition2 = 0;
 int16_t savedPosition3 = 0;
 int16_t savedPosition4 = 0;
 ```
-EEPROM addresses are defined for saving and retrieving motor positions.
+EEPROM addresses are defined for saving and retrieving motor positions when the immediate button is pressed.
 
 ### Button Configuration
 ``` cpp
@@ -281,11 +293,44 @@ void setNumberOfHoles() {
     _delay_ms(2000);
 }
 
-void executeOperation() {
-    lcd.clear();
-    lcd.print("Executing Operation");
+void execute_operation() {
+  int runloop = 1;
+
+  while (runloop) {
+    // Move to positions
+    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 1);  // Move 2000 steps forward
+    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 1);
+    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 1);
+    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 1);
+
+    // Wait until movement is complete or immediate button is pressed
+    while (runloop) {
+      if (immidiate()) {
+        runloop = 0;
+        break;
+      }
+    }
+
+    save_positions();
     _delay_ms(2000);
-    // Add code for executing the pick and place operation
+
+    // Move back to zero
+    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 0);  // Move 2000 steps backward
+    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 0);
+    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 0);
+    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 0);
+
+    // Wait until movement is complete or immediate button is pressed
+    while (runloop) {
+      if (immidiate()) {
+        runloop = 0;
+        break;
+      }
+    }
+
+    save_positions();
+    _delay_ms(2000);
+  }
 }
 ```
 ### Conclusion
