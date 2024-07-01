@@ -118,7 +118,7 @@ void setupLCD() {
 ```
 The LCD is initialized and a welcome message is displayed.
 
-### Main Menu Navigation
+### Display Menu Navigation
 ```cpp
 
 const char* options_main[] = { "1 - Menu", "2 - Continue" };
@@ -164,6 +164,49 @@ void loop() {
 }
 ```
 The loop() function handles the main operations of the robot arm, moving the steppers to predefined positions.
+
+### Main Operation Code
+```cpp
+void execute_operation() {
+  int runloop = 1;
+
+  while (runloop) {
+    // Move to positions
+    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 1);  // Move 2000 steps forward
+    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 1);
+    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 1);
+    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 1);
+
+    // Wait until movement is complete or immediate button is pressed
+    while (runloop) {
+      if (immidiate()) {
+        runloop = 0;
+        break;
+      }
+    }
+
+    save_positions();
+    _delay_ms(2000);
+
+    // Move back to zero
+    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 0);  // Move 2000 steps backward
+    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 0);
+    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 0);
+    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 0);
+
+    // Wait until movement is complete or immediate button is pressed
+    while (runloop) {
+      if (immidiate()) {
+        runloop = 0;
+        break;
+      }
+    }
+
+    save_positions();
+    _delay_ms(2000);
+  }
+}
+```
 
 ### Helper Functions
 ```cpp
@@ -292,47 +335,8 @@ void setNumberOfHoles() {
     lcd.print("Setting Number of Holes");
     _delay_ms(2000);
 }
-
-void execute_operation() {
-  int runloop = 1;
-
-  while (runloop) {
-    // Move to positions
-    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 1);  // Move 2000 steps forward
-    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 1);
-    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 1);
-    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 1);
-
-    // Wait until movement is complete or immediate button is pressed
-    while (runloop) {
-      if (immidiate()) {
-        runloop = 0;
-        break;
-      }
-    }
-
-    save_positions();
-    _delay_ms(2000);
-
-    // Move back to zero
-    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 0);  // Move 2000 steps backward
-    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 0);
-    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 0);
-    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 0);
-
-    // Wait until movement is complete or immediate button is pressed
-    while (runloop) {
-      if (immidiate()) {
-        runloop = 0;
-        break;
-      }
-    }
-
-    save_positions();
-    _delay_ms(2000);
-  }
-}
 ```
+
 ### Conclusion
 This project demonstrates the basics of a pick-and-place robot arm using an ATmega328P microcontroller. The robot arm can be calibrated, and its speed can be set through an LCD interface and push buttons.
 
