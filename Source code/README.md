@@ -126,8 +126,9 @@ Main menu options are defined with navigation logic implemented in the setup() f
 const char* options[] = { "1 - Calibration Mode", "2 - Set Speed", "3 - Number of the holes", "4 - Back" };
 const char* sub1_options[] = { "1 - Distance X axis", "2 - Distance Z axis", "3 - Back" };
 const char* sub2_options[] = { "1 - Stepper 1", "2 - Stepper 2", "3 - Stepper 3", "4 - Stepper 4", "5 - Back" };
-Submenu options for calibration and speed settings are defined with corresponding navigation logic.
 ```
+Submenu options for calibration and speed settings are defined with corresponding navigation logic.
+
 ### Loop Function
 
 ```cpp
