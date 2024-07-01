@@ -104,9 +104,9 @@ void setupLCD() {
     lcd.clear();
 }
 ```
-### The LCD is initialized and a welcome message is displayed.
+The LCD is initialized and a welcome message is displayed.
 
-Main Menu Navigation
+### Main Menu Navigation
 ```cpp
 
 const char* options_main[] = { "1 - Menu", "2 - Continue" };
@@ -120,17 +120,17 @@ void displayMainMenu() {
 ```
 Main menu options are defined with navigation logic implemented in the setup() function.
 
-Submenus
+### Submenus
 ```cpp
 
 const char* options[] = { "1 - Calibration Mode", "2 - Set Speed", "3 - Number of the holes", "4 - Back" };
 const char* sub1_options[] = { "1 - Distance X axis", "2 - Distance Z axis", "3 - Back" };
 const char* sub2_options[] = { "1 - Stepper 1", "2 - Stepper 2", "3 - Stepper 3", "4 - Stepper 4", "5 - Back" };
 Submenu options for calibration and speed settings are defined with corresponding navigation logic.
+```
+### Loop Function
 
-Loop Function
-cpp
-Copy code
+```cpp
 void loop() {
     while (1) {
         displayMainMenu();
@@ -152,7 +152,7 @@ void loop() {
 ```
 The loop() function handles the main operations of the robot arm, moving the steppers to predefined positions.
 
-Helper Functions
+### Helper Functions
 ```cpp
 
 bool currentStateChange(uint8_t pin) {
