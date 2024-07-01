@@ -60,18 +60,6 @@ This project involves the design and implementation of a pick-and-place robot ar
 
 These definitions set the pin numbers for the stepper motors and push buttons.
 
-### Stepper Motor Configuration
-```cpp
-
-void setupStepperPins() {
-    // Set direction and step pins as outputs
-    DDRD |= (1 << DIR_PIN1) | (1 << STEP_PIN1);
-    DDRD |= (1 << DIR_PIN2) | (1 << STEP_PIN2);
-    DDRD |= (1 << DIR_PIN3) | (1 << STEP_PIN3);
-    DDRB |= (1 << DIR_PIN4) | (1 << STEP_PIN4);
-}
-```
-
 ### EEPROM Setup
 ```cpp
 
