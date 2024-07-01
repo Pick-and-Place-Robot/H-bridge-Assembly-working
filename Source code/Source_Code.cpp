@@ -46,6 +46,22 @@ int16_t savedPosition2 = 0;
 int16_t savedPosition3 = 0;
 int16_t savedPosition4 = 0;
 
+int16_t initial_speed1 = 10;
+int16_t initial_speed2 = 10;
+int16_t initial_speed3 = 10;
+int16_t initial_speed4 = 10;
+int16_t initial_x_coordinate = 10;
+int16_t initial_z_coordinate = 10;
+int16_t default_holes = 6;
+
+int16_t temp_speed1 = 0;
+int16_t temp_speed2 = 0;
+int16_t temp_speed3 = 10;
+int16_t temp_speed4 = 10;
+int16_t temp_x_coordinate = 0;
+int16_t temp_z_coordinate = 0;
+int16_t temp_holes = 0;
+
 // LCD Initialization
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
