@@ -91,17 +91,76 @@ This function configures the button pins as inputs with pull-up resistors.
 ### LCD Initialization
 ```cpp
 
-#include <Wire.h>
-#include "LiquidCrystal_I2C.h"
+// LCD Initialization
+void i2c_init() {
+    // Initialize I2C (TWI) interface
+    TWSR = 0x00;  // Set prescaler to 1
+    TWBR = 0x0C;  // Set bit rate register (SCL frequency = F_CPU / (16 + 2 * TWBR * prescaler))
+    TWCR = (1 << TWEN);  // Enable TWI
+}
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+void i2c_start() {
+    // Send start condition
+    TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
+    while (!(TWCR & (1 << TWINT)));  // Wait for start condition to be transmitted
+}
+
+void i2c_stop() {
+    // Send stop condition
+    TWCR = (1 << TWINT) | (1 << TWSTO) | (1 << TWEN);
+    while (TWCR & (1 << TWSTO));  // Wait for stop condition to be executed
+}
+
+void i2c_write(uint8_t data) {
+    // Write data to TWI data register
+    TWDR = data;
+    TWCR = (1 << TWINT) | (1 << TWEN);
+    while (!(TWCR & (1 << TWINT)));  // Wait for data to be transmitted
+}
+
+void lcd_command(uint8_t cmd) {
+    // Send command to LCD
+    i2c_start();
+    i2c_write(0x4E);  // LCD I2C address
+    i2c_write(0x00);  // Control byte: Co = 0, RS = 0
+    i2c_write(cmd);
+    i2c_stop();
+}
+
+void lcd_data(uint8_t data) {
+    // Send data to LCD
+    i2c_start();
+    i2c_write(0x4E);  // LCD I2C address
+    i2c_write(0x40);  // Control byte: Co = 0, RS = 1
+    i2c_write(data);
+    i2c_stop();
+}
+
+void lcd_init() {
+    // Initialize LCD
+    _delay_ms(50);
+    lcd_command(0x38);  // Function set: 8-bit, 2 lines, 5x8 dots
+    _delay_ms(5);
+    lcd_command(0x0C);  // Display on, cursor off, blink off
+    _delay_ms(5);
+    lcd_command(0x01);  // Clear display
+    _delay_ms(5);
+    lcd_command(0x06);  // Entry mode set: increment, no shift
+}
+
+void lcd_print(const char* str) {
+    // Print string to LCD
+    while (*str) {
+        lcd_data(*str++);
+    }
+}
 
 void setupLCD() {
-    lcd.init();
-    lcd.backlight();
-    lcd.print("Welcome to Pick and Place Robot Arm");
+    i2c_init();
+    lcd_init();
+    lcd_print("Welcome to Pick and Place Robot Arm");
     _delay_ms(5000);
-    lcd.clear();
+    lcd_command(0x01);  // Clear display
 }
 ```
 The LCD is initialized and a welcome message is displayed.
