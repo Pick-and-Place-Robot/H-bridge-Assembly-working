@@ -66,6 +66,7 @@ int16_t temp_x_coordinate = 0;
 int16_t temp_z_coordinate = 0;
 int16_t temp_holes = 0;
 
+int16_t  runloop = 1;
 // LCD Initialization
 void i2c_init() {
     // Initialize I2C (TWI) interface
@@ -223,6 +224,13 @@ void stepper_to_fingers(int distance) {
 }
 
 void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
+
+    //check immediate action
+    if (immediate()) {
+            save_positions();  // Save current positions
+            runloop = 0;       // Exit the loop
+            break;
+        }
     // Set direction
     if (direction) {
         *dir_port |= (1 << dir_pin);
@@ -262,23 +270,38 @@ void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t 
 
 
 void execute_operation() {
-    int runloop = 1;
-
+    
+    stepper_to_horizontal(40);  // Move stepper 1 horizontally by 40 cm
+    stepper_to_vertical(30);    // Move stepper 2 vertically by 30cm
+    
     while (runloop) {
         // Execute the sequence of movements
-        stepper_to_horizontal(2000);  // Move stepper 1 horizontally by 2000 steps
-        stepper_to_vertical(1000);    // Move stepper 2 vertically by 1000 steps
-        stepper_to_rotation(360);     // Rotate stepper 3 by 360 degrees (or steps)
-        stepper_to_fingers(500);      // Move stepper 4 for fingers/gripper by 500 steps
+        stepper_to_fingers(5);
+        _delay_ms(1000); 
+        stepper_to_horizontal(-5);
+        _delay_ms(1000); 
+        stepper_to_vertical(-10);
+        _delay_ms(1000); 
 
-        // Check if immediate action is required
-        if (immediate()) {
-            save_positions();  // Save current positions
-            runloop = 0;       // Exit the loop
-            break;
+        stepper_to_horizontal(5);
+        _delay_ms(1000); 
+        for (int i=0,I<holes,i++){
+            stepper_to_rotation(30); 
+            _delay_ms(2000); 
         }
+        stepper_to_horizontal(-5);
+        _delay_ms(1000); 
 
-        _delay_ms(2000);  // Wait for 2 seconds before repeating the loop
+        stepper_to_vertical(20);
+        _delay_ms(1000); 
+        stepper_to_horizontal(5);
+        _delay_ms(1000); 
+        stepper_to_fingers(-5);
+        _delay_ms(1000); 
+
+        stepper_to_vertical(-10);
+
+        _delay_ms(5000);  // Wait for 2 seconds before repeating the loop
     }
 }
 
