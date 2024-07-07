@@ -301,7 +301,7 @@ void execute_operation() {
 
         stepper_to_vertical(-10);
 
-        _delay_ms(5000);  // Wait for 2 seconds before repeating the loop
+        _delay_ms(5000);  // Wait for 5 seconds 
     }
 }
 
