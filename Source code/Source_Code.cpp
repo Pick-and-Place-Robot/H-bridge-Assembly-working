@@ -3,6 +3,11 @@
 #include <util/delay.h>
 #include <avr/eeprom.h>
 
+// Define the parameters
+#define MAX_SPEED 200   // Maximum speed (steps per second)
+#define ACCEL_RATE 10   // Acceleration rate (steps per second^2)
+#define DECEL_RATE 10   // Deceleration rate (steps per second^2)
+
 // Define F_CPU for _delay_ms()
 #define F_CPU 16000000UL
 
@@ -173,27 +178,34 @@ void loop() {
 }
 
 
-void stepper_to_horizontal(int distance) {
+void stepper_to_horizontal(int distance_cm) {
     // Calculate steps based on distance (convert cm to steps)
-    int steps = distance;  // Replace with your conversion formula
+    // 360 degrees of rotation corresponds to 2 cm of linear distance
+    float distance_per_rotation_cm = 2.0; 
+    float steps_per_cm = 200.0;  // full step mode
+    
+    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
 
     // Move the motor
     step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, steps, 1);
 }
 
+
 // Function to move stepper motor 2 vertically
 void stepper_to_vertical(int distance) {
-    // Calculate steps based on distance (convert cm to steps)
-    int steps = distance;  // Replace with your conversion formula
-
-    // Move the motor
+    /// Calculate steps based on distance (convert cm to steps)
+    // 360 degrees of rotation corresponds to 2 cm of linear distance
+    float distance_per_rotation_cm = 2.0; 
+    float steps_per_cm = 200.0;  // full step mode
+    
+    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
     step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, steps, 1);
 }
 
 // Function to rotate stepper motor 3 by a specified angle
 void stepper_to_rotation(int angle) {
     // Calculate steps based on angle (convert degrees to steps)
-    int steps = angle;  // Replace with your conversion formula
+    int steps = angle*200/360;  
 
     // Move the motor
     step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, steps, 1);
@@ -201,11 +213,51 @@ void stepper_to_rotation(int angle) {
 
 // Function to move stepper motor 4 for fingers or gripper movement
 void stepper_to_fingers(int distance) {
-    // Calculate steps based on distance (convert cm to steps)
-    int steps = distance;  // Replace with your conversion formula
-
-    // Move the motor
+     /// Calculate steps based on distance (convert cm to steps)
+    // 360 degrees of rotation corresponds to 2 cm of linear distance
+    float distance_per_rotation_cm = 1.0; 
+    float steps_per_cm = 200.0;  // full step mode
+    
+    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
     step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, steps, 1);
+}
+
+void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
+    // Set direction
+    if (direction) {
+        *dir_port |= (1 << dir_pin);
+    } else {
+        *dir_port &= ~(1 << dir_pin);
+    }
+
+    // Calculate the number of steps for each phase
+    uint16_t accel_steps = MAX_SPEED / ACCEL_RATE;
+    uint16_t decel_steps = MAX_SPEED / DECEL_RATE;
+    uint16_t constant_steps = steps - (accel_steps + decel_steps);
+
+    // Acceleration phase
+    for (uint16_t i = 0; i < accel_steps; i++) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+    }
+
+    // Constant speed phase
+    for (uint16_t i = 0; i < constant_steps; i++) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / MAX_SPEED);
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / MAX_SPEED);
+    }
+
+    // Deceleration phase
+    for (uint16_t i = decel_steps; i > 0; i--) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / (DECEL_RATE * i + 1));
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / (DECEL_RATE * i + 1));
+    }
 }
 
 
@@ -521,23 +573,6 @@ void setNumberOfHoles() {
     }
 }
 
-
-void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
-    // Set direction
-    if (direction) {
-        *dir_port |= (1 << dir_pin);
-    } else {
-        *dir_port &= ~(1 << dir_pin);
-    }
-
-    // Step the motor
-    for (uint16_t i = 0; i < steps; i++) {
-        *step_port |= (1 << step_pin);
-        _delay_us(500);  // Adjust delay as needed for motor speed
-        *step_port &= ~(1 << step_pin);
-        _delay_us(500);  // Adjust delay as needed for motor speed
-    }
-}
 
 bool immediate() {
     return !currentStateChange(IMMEDIATE_BUTTON_PIN);
