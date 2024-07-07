@@ -4,7 +4,7 @@
 #include <avr/eeprom.h>
 
 // Define the parameters
-#define MAX_SPEED 200   // Maximum speed (steps per second)
+#define MAX_SPEED  33  //200   // Maximum speed (steps per second)
 #define ACCEL_RATE 10   // Acceleration rate (steps per second^2)
 #define DECEL_RATE 10   // Deceleration rate (steps per second^2)
 
@@ -237,6 +237,8 @@ void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t 
     } else {
         *dir_port &= ~(1 << dir_pin);
     }
+     
+    int MAX_STEP_SPEED =MAX_SPEED*200/2
 
     // Calculate the number of steps for each phase
     uint16_t accel_steps = MAX_SPEED / ACCEL_RATE;
