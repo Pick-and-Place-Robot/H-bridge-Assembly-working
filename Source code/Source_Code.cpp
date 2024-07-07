@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
 #include <avr/eeprom.h>
 
@@ -164,7 +165,7 @@ void calibrateZAxis();
 void setSpeed(int stepper);
 void setNumberOfHoles();
 void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction);
-bool immidiate();
+bool immediate();
 
 void loop() {
     while (1) {
@@ -197,13 +198,14 @@ void execute_operation() {
 
         // Wait until movement is complete or immediate button is pressed
         while (runloop) {
-            if (immidiate()) {
+            if (immediate()) {
+                save_positions();
                 runloop = 0;
                 break;
             }
         }
 
-        save_positions();
+        
         _delay_ms(2000);
 
         // Move back to zero
@@ -214,32 +216,51 @@ void execute_operation() {
 
         // Wait until movement is complete or immediate button is pressed
         while (runloop) {
-            if (immidiate()) {
+            if (immediate()) {
+                save_positions();
                 runloop = 0;
                 break;
             }
         }
 
-        save_positions();
+        
         _delay_ms(2000);
     }
 }
 
 // Helper Functions
 bool currentStateChange(uint8_t pin) {
-    static uint8_t lastState = 0xFF;
-    uint8_t currentState = PINC & (1 << pin);
-    if (currentState != lastState) {
-        lastState = currentState;
-        if (currentState == 0) {
-            return true;
-        }
+    static uint8_t lastState[5] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+    static uint8_t counter[5] = { 0, 0, 0, 0, 0 };
+    uint8_t index = 0;
+
+    switch (pin) {
+        case UP_BUTTON_PIN: index = 0; break;
+        case DOWN_BUTTON_PIN: index = 1; break;
+        case MENU_BUTTON_PIN: index = 2; break;
+        case CANCEL_BUTTON_PIN: index = 3; break;
+        case IMMEDIATE_BUTTON_PIN: index = 4; break;
     }
+
+    uint8_t currentState = (PINC & (1 << pin)) >> pin;
+    if (currentState != lastState[index]) {
+        counter[index]++;
+        if (counter[index] >= 4) {  // Debounce threshold
+            counter[index] = 0;
+            lastState[index] = currentState;
+            if (currentState == 0) {
+                return true;
+            }
+        }
+    } else {
+        counter[index] = 0;
+    }
+
     return false;
 }
 
 void savePositionToEEPROM(uint16_t addr, int16_t value) {
-    eeprom_write_word((uint16_t*)addr, value);
+    eeprom_update_word((uint16_t*)addr, value);
 }
 
 int16_t readPositionFromEEPROM(uint16_t addr) {
@@ -247,126 +268,136 @@ int16_t readPositionFromEEPROM(uint16_t addr) {
 }
 
 void navigateMenu() {
-    int current_sub_mode = 0;
-    const int max_sub_modes = 4;
+    int mode = 0;
+    int sub_mode1 = 0;
+    int sub_mode2 = 0;
+
     while (1) {
-        lcd.clear();
-        lcd.print(options[current_sub_mode]);
+        lcd_command(0x01);  // Clear display
+        lcd_print(options[mode]);
         _delay_ms(100);
 
         if (currentStateChange(UP_BUTTON_PIN)) {
-            current_sub_mode = (current_sub_mode + 1) % max_sub_modes;
+            mode = (mode + 1) % 4;
         } else if (currentStateChange(DOWN_BUTTON_PIN)) {
-            current_sub_mode = (current_sub_mode - 1 + max_sub_modes) % max_sub_modes;
+            mode = (mode - 1 + 4) % 4;
         } else if (currentStateChange(MENU_BUTTON_PIN)) {
-            if (current_sub_mode == 0) {
-                navigateSub1Menu();
-            } else if (current_sub_mode == 1) {
-                navigateSub2Menu();
-            } else if (current_sub_mode == 2) {
-                setNumberOfHoles();
-            } else {
-                break;
+            switch (mode) {
+                case 0:
+                    while (1) {
+                        navigateSub1Menu(&sub_mode1);
+                        if (sub_mode1 == 2) break;
+                        if (currentStateChange(MENU_BUTTON_PIN)) {
+                            switch (sub_mode1) {
+                                case 0: calibrateXAxis(); break;
+                                case 1: calibrateZAxis(); break;
+                            }
+                        }
+                    }
+                    break;
+                case 1:
+                    while (1) {
+                        navigateSub2Menu(&sub_mode2);
+                        if (sub_mode2 == 4) break;
+                        if (currentStateChange(MENU_BUTTON_PIN)) {
+                            switch (sub_mode2) {
+                                case 0: setSpeed(1); break;
+                                case 1: setSpeed(2); break;
+                                case 2: setSpeed(3); break;
+                                case 3: setSpeed(4); break;
+                            }
+                        }
+                    }
+                    break;
+                case 2: setNumberOfHoles(); break;
+                case 3: return;
             }
         }
     }
 }
 
-void navigateSub1Menu() {
-    int current_sub1_mode = 0;
-    const int max_sub1_modes = 3;
-    while (1) {
-        lcd.clear();
-        lcd.print(sub1_options[current_sub1_mode]);
-        _delay_ms(100);
+void navigateSub1Menu(int* sub_mode1) {
+    lcd_command(0x01);  // Clear display
+    lcd_print(sub1_options[*sub_mode1]);
+    _delay_ms(100);
 
-        if (currentStateChange(UP_BUTTON_PIN)) {
-            current_sub1_mode = (current_sub1_mode + 1) % max_sub1_modes;
-        } else if (currentStateChange(DOWN_BUTTON_PIN)) {
-            current_sub1_mode = (current_sub1_mode - 1 + max_sub1_modes) % max_sub1_modes;
-        } else if (currentStateChange(MENU_BUTTON_PIN)) {
-            if (current_sub1_mode == 0) {
-                calibrateXAxis();
-            } else if (current_sub1_mode == 1) {
-                calibrateZAxis();
-            } else {
-                break;
-            }
-        }
+    if (currentStateChange(UP_BUTTON_PIN)) {
+        *sub_mode1 = (*sub_mode1 + 1) % 3;
+    } else if (currentStateChange(DOWN_BUTTON_PIN)) {
+        *sub_mode1 = (*sub_mode1 - 1 + 3) % 3;
     }
 }
 
-void navigateSub2Menu() {
-    int current_sub2_mode = 0;
-    const int max_sub2_modes = 5;
-    while (1) {
-        lcd.clear();
-        lcd.print(sub2_options[current_sub2_mode]);
-        _delay_ms(100);
+void navigateSub2Menu(int* sub_mode2) {
+    lcd_command(0x01);  // Clear display
+    lcd_print(sub2_options[*sub_mode2]);
+    _delay_ms(100);
 
-        if (currentStateChange(UP_BUTTON_PIN)) {
-            current_sub2_mode = (current_sub2_mode + 1) % max_sub2_modes;
-        } else if (currentStateChange(DOWN_BUTTON_PIN)) {
-            current_sub2_mode = (current_sub2_mode - 1 + max_sub2_modes) % max_sub2_modes;
-        } else if (currentStateChange(MENU_BUTTON_PIN)) {
-            if (current_sub2_mode == 0) {
-                setSpeed(1);
-            } else if (current_sub2_mode == 1) {
-                setSpeed(2);
-            } else if (current_sub2_mode == 2) {
-                setSpeed(3);
-            } else if (current_sub2_mode == 3) {
-                setSpeed(4);
-            } else {
-                break;
-            }
-        }
+    if (currentStateChange(UP_BUTTON_PIN)) {
+        *sub_mode2 = (*sub_mode2 + 1) % 5;
+    } else if (currentStateChange(DOWN_BUTTON_PIN)) {
+        *sub_mode2 = (*sub_mode2 - 1 + 5) % 5;
     }
 }
 
 void calibrateXAxis() {
-    lcd.clear();
-    lcd.print("Calibrating X Axis");
-    _delay_ms(2000);
-    savePositionToEEPROM(eepromAddr_stepper1, savedPosition1);
+    // Calibration for X Axis
+    lcd_command(0x01);  // Clear display
+    lcd_print("Calibrating X Axis");
+    _delay_ms(1000);
+
+    // Implement calibration logic here
 }
 
 void calibrateZAxis() {
-    lcd.clear();
-    lcd.print("Calibrating Z Axis");
-    _delay_ms(2000);
-    savePositionToEEPROM(eepromAddr_stepper2, savedPosition2);
+    // Calibration for Z Axis
+    lcd_command(0x01);  // Clear display
+    lcd_print("Calibrating Z Axis");
+    _delay_ms(1000);
+
+    // Implement calibration logic here
 }
 
 void setSpeed(int stepper) {
-    lcd.clear();
-    lcd.print("Setting Speed for Stepper ");
-    lcd.print(stepper);
-    _delay_ms(2000);
+    // Set Speed for a stepper motor
+    lcd_command(0x01);  // Clear display
+    lcd_print("Set Speed");
+    _delay_ms(1000);
+
+    // Implement speed setting logic here
 }
 
 void setNumberOfHoles() {
-    lcd.clear();
-    lcd.print("Setting Number of Holes");
-    _delay_ms(2000);
+    // Set Number of Holes
+    lcd_command(0x01);  // Clear display
+    lcd_print("Set Number of Holes");
+    _delay_ms(1000);
+
+    // Implement number of holes setting logic here
 }
 
 void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
-    // Example function to step the motor
-    *dir_port = (*dir_port & ~(1 << dir_pin)) | (direction << dir_pin);  // Set direction
+    // Set direction
+    if (direction) {
+        *dir_port |= (1 << dir_pin);
+    } else {
+        *dir_port &= ~(1 << dir_pin);
+    }
+
+    // Step the motor
     for (uint16_t i = 0; i < steps; i++) {
-        *step_port |= (1 << step_pin);  // Set step pin high
-        _delay_us(100);  
-        *step_port &= ~(1 << step_pin);  // Set step pin low
-        _delay_us(100);
+        *step_port |= (1 << step_pin);
+        _delay_us(500);  // Adjust delay as needed for motor speed
+        *step_port &= ~(1 << step_pin);
+        _delay_us(500);  // Adjust delay as needed for motor speed
     }
 }
 
-bool immidiate() {
-    // Check if the immediate stop button is pressed
-    return !(PINC & (1 << IMMEDIATE_BUTTON_PIN));
+bool immediate() {
+    return !currentStateChange(IMMEDIATE_BUTTON_PIN);
 }
 
+// Save current positions to EEPROM
 void save_positions() {
     savePositionToEEPROM(eepromAddr_stepper1, savedPosition1);
     savePositionToEEPROM(eepromAddr_stepper2, savedPosition2);
@@ -374,18 +405,25 @@ void save_positions() {
     savePositionToEEPROM(eepromAddr_stepper4, savedPosition4);
 }
 
-void setup() {
-    // Initialize LCD
-    setupLCD();
-    // Initialize button pins
-    setupButtonPins();
-   
-}
-//main code
 int main() {
-    setup();
-    while (1) {
-        loop();
-    }
+    // Set direction and step pins as output
+    DDRD |= (1 << DIR1_PIN) | (1 << STEP1_PIN) | (1 << DIR2_PIN) | (1 << STEP2_PIN) | (1 << DIR3_PIN) | (1 << STEP3_PIN);
+    DDRB |= (1 << DIR4_PIN) | (1 << STEP4_PIN);
+
+    // Initialize LCD and buttons
+    setupLCD();
+    setupButtonPins();
+
+    // Initialize motor positions from EEPROM
+    savedPosition1 = readPositionFromEEPROM(eepromAddr_stepper1);
+    savedPosition2 = readPositionFromEEPROM(eepromAddr_stepper2);
+    savedPosition3 = readPositionFromEEPROM(eepromAddr_stepper3);
+    savedPosition4 = readPositionFromEEPROM(eepromAddr_stepper4);
+
+    sei();  // Enable global interrupts
+
+    // Main loop
+    loop();
+
     return 0;
 }
