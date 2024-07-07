@@ -2,7 +2,7 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <avr/eeprom.h>
-
+#include <stdbool.h>
 // Define the parameters
 #define MAX_SPEED  33  // Maximum speed (mm per second)
 #define ACCEL_RATE 10   // Acceleration rate (mm per second^2)
