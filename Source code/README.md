@@ -1,392 +1,241 @@
-# Pick-and-Place Robot Arm
+# Pick and Place Robot Arm
 
-## Introduction
-This project involves the design and implementation of a pick-and-place robot arm. The robot arm is controlled using stepper motors and an LCD interface, with various settings and calibration modes accessible through push buttons.
+This project is an AVR microcontroller-based pick and place robot arm. The robot arm is controlled by stepper motors, and an LCD is used for displaying information. The system allows the user to navigate through different menus to calibrate the robot, set the speed of the stepper motors, and set the number of holes to be drilled. The project also saves and retrieves the positions of the stepper motors from EEPROM.
+
+## Features
+- Control four stepper motors for horizontal, vertical, rotational, and gripper movement.
+- LCD display for user interaction.
+- Save and load stepper motor positions from EEPROM.
+- Configure motor speed and number of holes.
+- Immediate stop button functionality.
 
 ## Hardware Setup
-- **Microcontroller:** ATmega328P (Arduino Uno)
-- **Stepper Motors:** 4 stepper motors with drivers
-- **LCD:** I2C LCD (16x2)
-- **Push Buttons:** 5 buttons for navigation and immediate stop
+- **Microcontroller**: AVR ATmega series
+- **LCD**: I2C LCD Display
+- **Stepper Motors**: Four stepper motors connected to respective pins
+- **Buttons**: Up, Down, Menu, Cancel, Immediate Stop buttons
+- 
 
-## Software Setup
+## Pin Configuration
+- **Stepper Motors**:
+  - Motor 1 (Horizontal): Direction - PD3, Step - PD2
+  - Motor 2 (Vertical): Direction - PD5, Step - PD4
+  - Motor 3 (Rotational): Direction - PD7, Step - PD6
+  - Motor 4 (Gripper): Direction - PB1, Step - PB0
+- **Buttons**:
+  - Up Button: PC0
+  - Down Button: PC1
+  - Menu Button: PC2
+  - Cancel Button: PC3
+  - Immediate Stop Button: PC4
 
-### Libraries Used
-- `Wire.h`: For I2C communication with the LCD
+## Parameters
+- Maximum Speed: 200 steps per second
+- Acceleration Rate: 10 steps per second²
+- Deceleration Rate: 10 steps per second²
 
-### Installation
-1. Install the required libraries in the Arduino IDE:
-    - `Wire.h`
-2. Upload the provided code to the ATmega328P using an ISP programmer.
+## EEPROM Addresses
+- Motor 1 Position: Address 0
+- Motor 2 Position: Address 2
+- Motor 3 Position: Address 4
+- Motor 4 Position: Address 6
+
+## Installation
+1. Clone the repository or download the source code.
+2. Open the project in your favorite AVR development environment (e.g., Atmel Studio).
+3. Connect the hardware as per the pin configuration.
+4. Compile and upload the code to the AVR microcontroller.
+
+## Usage
+### Main Menu
+- **1 - Menu**: Navigate to the main menu.
+- **2 - Continue**: Execute the pick and place operation.
+
+
+### Main Menu Options
+- **1 - Calibration Mode**: Calibrate the robot arm.
+- **2 - Set Speed**: Set the speed for each stepper motor.
+- **3 - Number of the holes**: Set the number of holes to be drilled.
+- **4 - Back**: Return to the main menu.
+
+### Calibration Mode
+- **1 - Distance X axis**: Calibrate the horizontal distance.
+- **2 - Distance Z axis**: Calibrate the verticle distance.
+
+### Set Speed
+- **1 - Set Speed for Motor 1**: Set the speed for the horizontal movement.
+- **2- Set Speed for Motor 2**: Set the speed for the vertical movement.
+- **3 - Set Speed for Motor 3**: Set the speed for the rotational movement.
+- **4 - Set Speed for Motor 4**: Set the speed for the gripper.
+- **5 - Back***: Return to the main menu.
+
+### Number of Holes
+1 - Increase Number of Holes: Increase the number of holes to be drilled.
+2 - Decrease Number of Holes: Decrease the number of holes to be drilled.
+3 - Save and Back: Save the settings and return to the main menu.
+
+
+### Operation
+Power on the robot arm: Ensure all connections are secure and power on the system.
+Navigate the Menu: Use the buttons to navigate through the menu and configure the settings.
+Calibrate: Perform calibration if needed.
+Set Speed and Number of Holes: Adjust the speed of the motors and set the number of holes.
+Execute Operation: Once settings are configured, select "Continue" from the main menu to start the pick and place operation.
 
 ## Code Explanation
 
-### Pin Definitions
+### Initialization
+In the `setup()` function, initialize the LCD, buttons, and stepper motors:
 
-```cpp
-#include <avr/io.h>
-#include <util/delay.h>
-#include <avr/eeprom.h>
-
-#define F_CPU 16000000UL
-
-#define DIR1_PORT PORTD
-#define DIR1_PIN PD3
-#define STEP1_PORT PORTD
-#define STEP1_PIN PD2
-
-#define DIR2_PORT PORTD
-#define DIR2_PIN PD5
-#define STEP2_PORT PORTD
-#define STEP2_PIN PD4
-
-#define DIR3_PORT PORTD
-#define DIR3_PIN PD7
-#define STEP3_PORT PORTD
-#define STEP3_PIN PD6
-
-#define DIR4_PORT PORTB
-#define DIR4_PIN PB1
-#define STEP4_PORT PORTB
-#define STEP4_PIN PB0
-
-#define UP_BUTTON_PIN PC0
-#define DOWN_BUTTON_PIN PC1
-#define MENU_BUTTON_PIN PC2
-#define CANCEL_BUTTON_PIN PC3
-#define IMMEDIATE_BUTTON_PIN PC4
-
-```
-
-These definitions set the pin numbers for the stepper motors and push buttons.
-
-### EEPROM Setup
-```cpp
-
-uint16_t eepromAddr_stepper1 = 0;
-uint16_t eepromAddr_stepper2 = 2;
-uint16_t eepromAddr_stepper3 = 4;
-uint16_t eepromAddr_stepper4 = 6;
-
-int16_t savedPosition1 = 0;
-int16_t savedPosition2 = 0;
-int16_t savedPosition3 = 0;
-int16_t savedPosition4 = 0;
-```
-EEPROM addresses are defined for saving and retrieving motor positions when the immediate button is pressed.
-
-### Button Configuration
-``` cpp
-
-void setupButtonPins() {
-    // Set button pins as inputs with pull-up resistors
-    DDRB &= ~((1 << UP_PIN) | (1 << DOWN_PIN) | (1 << MENU_PIN) | (1 << CANCEL_PIN));
-    PORTB |= (1 << UP_PIN) | (1 << DOWN_PIN) | (1 << MENU_PIN) | (1 << CANCEL_PIN);
-    DDRC &= ~(1 << IMMEDIATE_PIN);
-    PORTC |= (1 << IMMEDIATE_PIN);
-}
-```
-This function configures the button pins as inputs with pull-up resistors.
-
-### LCD Initialization
-```cpp
-
-// LCD Initialization
-void i2c_init() {
-    // Initialize I2C (TWI) interface
-    TWSR = 0x00;  // Set prescaler to 1
-    TWBR = 0x0C;  // Set bit rate register (SCL frequency = F_CPU / (16 + 2 * TWBR * prescaler))
-    TWCR = (1 << TWEN);  // Enable TWI
-}
-
-void i2c_start() {
-    // Send start condition
-    TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
-    while (!(TWCR & (1 << TWINT)));  // Wait for start condition to be transmitted
-}
-
-void i2c_stop() {
-    // Send stop condition
-    TWCR = (1 << TWINT) | (1 << TWSTO) | (1 << TWEN);
-    while (TWCR & (1 << TWSTO));  // Wait for stop condition to be executed
-}
-
-void i2c_write(uint8_t data) {
-    // Write data to TWI data register
-    TWDR = data;
-    TWCR = (1 << TWINT) | (1 << TWEN);
-    while (!(TWCR & (1 << TWINT)));  // Wait for data to be transmitted
-}
-
-void lcd_command(uint8_t cmd) {
-    // Send command to LCD
-    i2c_start();
-    i2c_write(0x4E);  // LCD I2C address
-    i2c_write(0x00);  // Control byte: Co = 0, RS = 0
-    i2c_write(cmd);
-    i2c_stop();
-}
-
-void lcd_data(uint8_t data) {
-    // Send data to LCD
-    i2c_start();
-    i2c_write(0x4E);  // LCD I2C address
-    i2c_write(0x40);  // Control byte: Co = 0, RS = 1
-    i2c_write(data);
-    i2c_stop();
-}
-
-void lcd_init() {
+```c
+void setup() {
     // Initialize LCD
-    _delay_ms(50);
-    lcd_command(0x38);  // Function set: 8-bit, 2 lines, 5x8 dots
-    _delay_ms(5);
-    lcd_command(0x0C);  // Display on, cursor off, blink off
-    _delay_ms(5);
-    lcd_command(0x01);  // Clear display
-    _delay_ms(5);
-    lcd_command(0x06);  // Entry mode set: increment, no shift
-}
+    lcd.begin(16, 2);
+    lcd.print("Initializing...");
 
-void lcd_print(const char* str) {
-    // Print string to LCD
-    while (*str) {
-        lcd_data(*str++);
-    }
-}
+    // Initialize buttons
+    pinMode(BUTTON1_PIN, INPUT_PULLUP);
+    pinMode(BUTTON2_PIN, INPUT_PULLUP);
+    pinMode(BUTTON3_PIN, INPUT_PULLUP);
+    pinMode(BUTTON4_PIN, INPUT_PULLUP);
 
-void setupLCD() {
-    i2c_init();
-    lcd_init();
-    lcd_print("Welcome to Pick and Place Robot Arm");
-    _delay_ms(5000);
-    lcd_command(0x01);  // Clear display
-}
-```
-The LCD is initialized and a welcome message is displayed.
+    // Initialize stepper motors
+    stepper1.setSpeed(initial_speed);
+    stepper2.setSpeed(initial_speed);
+    stepper3.setSpeed(initial_speed);
+    stepper4.setSpeed(initial_speed);
 
-### Display Menu Navigation
-```cpp
-
-const char* options_main[] = { "1 - Menu", "2 - Continue" };
-int current_main_mode = 0;
-const int max_main_modes = 2;
-
-void displayMainMenu() {
     lcd.clear();
-    lcd.print(options_main[current_main_mode]);
+    lcd.print("Ready");
 }
 ```
-Main menu options are defined with navigation logic implemented in the setup() function.
+### Menu Navigation
+Implement the menu navigation using button inputs to select various options:
 
-### Submenus
-```cpp
+```c
 
-const char* options[] = { "1 - Calibration Mode", "2 - Set Speed", "3 - Number of the holes", "4 - Back" };
-const char* sub1_options[] = { "1 - Distance X axis", "2 - Distance Z axis", "3 - Back" };
-const char* sub2_options[] = { "1 - Stepper 1", "2 - Stepper 2", "3 - Stepper 3", "4 - Stepper 4", "5 - Back" };
-```
-Submenu options for calibration and speed settings are defined with corresponding navigation logic.
-
-### Loop Function
-
-```cpp
 void loop() {
-    while (1) {
-        displayMainMenu();
-        _delay_ms(100);
-
-        if (currentStateChange(UP_PIN)) {
-            current_main_mode = (current_main_mode + 1) % max_main_modes;
-        } else if (currentStateChange(DOWN_PIN)) {
-            current_main_mode = (current_main_mode - 1 + max_main_modes) % max_main_modes;
-        } else if (currentStateChange(MENU_PIN)) {
-            if (current_main_mode == 0) {
-                navigateMenu();
-            } else {
-                executeOperation();
-            }
-        }
+    if (digitalRead(BUTTON1_PIN) == LOW) {
+        // Navigate to Calibration Mode
+        calibrationMode();
+    } else if (digitalRead(BUTTON2_PIN) == LOW) {
+        // Navigate to Set Speed Mode
+        setSpeedMode();
+    } else if (digitalRead(BUTTON3_PIN) == LOW) {
+        // Navigate to Number of Holes
+        numberOfHolesMode();
+    } else if (digitalRead(BUTTON4_PIN) == LOW) {
+        // Execute Operation
+        executeOperation();
     }
 }
 ```
-The loop() function handles the main operations of the robot arm, moving the steppers to predefined positions.
+### Calibration Mode
+Allow the user to manually control each motor to set the initial positions:
 
-### Main Operation Code
-```cpp
-void execute_operation() {
-  int runloop = 1;
+```c
 
-  while (runloop) {
-    // Move to positions
-    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 1);  // Move 2000 steps forward
-    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 1);
-    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 1);
-    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 1);
-
-    // Wait until movement is complete or immediate button is pressed
-    while (runloop) {
-      if (immidiate()) {
-        runloop = 0;
-        break;
-      }
-    }
-
-    save_positions();
-    _delay_ms(2000);
-
-    // Move back to zero
-    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 0);  // Move 2000 steps backward
-    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 0);
-    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 0);
-    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 0);
-
-    // Wait until movement is complete or immediate button is pressed
-    while (runloop) {
-      if (immidiate()) {
-        runloop = 0;
-        break;
-      }
-    }
-
-    save_positions();
-    _delay_ms(2000);
-  }
+void calibrationMode() {
+    lcd.clear();
+    lcd.print("Calibration Mode");
+    // Code to manually control motors
+    // ...
 }
 ```
+### Set Speed
+Set the speed for each stepper motor:
 
-### Helper Functions
-```cpp
+```c
 
-bool currentStateChange(uint8_t pin) {
-    static uint8_t lastState = 0xFF;
-    uint8_t currentState = PINB & (1 << pin);
-    if (currentState != lastState) {
-        lastState = currentState;
-        if (currentState == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void savePositionToEEPROM(uint16_t addr, int16_t value) {
-    eeprom_write_word((uint16_t*)addr, value);
-}
-
-int16_t readPositionFromEEPROM(uint16_t addr) {
-    return eeprom_read_word((uint16_t*)addr);
-}
-
-void navigateMenu() {
-    int current_sub_mode = 0;
-    const int max_sub_modes = 4;
-    while (1) {
-        lcd.clear();
-        lcd.print(options[current_sub_mode]);
-        _delay_ms(100);
-
-        if (currentStateChange(UP_PIN)) {
-            current_sub_mode = (current_sub_mode + 1) % max_sub_modes;
-        } else if (currentStateChange(DOWN_PIN)) {
-            current_sub_mode = (current_sub_mode - 1 + max_sub_modes) % max_sub_modes;
-        } else if (currentStateChange(MENU_PIN)) {
-            if (current_sub_mode == 0) {
-                navigateSub1Menu();
-            } else if (current_sub_mode == 1) {
-                navigateSub2Menu();
-            } else if (current_sub_mode == 2) {
-                setNumberOfHoles();
-            } else {
-                break;
-            }
-        }
-    }
-}
-
-void navigateSub1Menu() {
-    int current_sub1_mode = 0;
-    const int max_sub1_modes = 3;
-    while (1) {
-        lcd.clear();
-        lcd.print(sub1_options[current_sub1_mode]);
-        _delay_ms(100);
-
-        if (currentStateChange(UP_PIN)) {
-            current_sub1_mode = (current_sub1_mode + 1) % max_sub1_modes;
-        } else if (currentStateChange(DOWN_PIN)) {
-            current_sub1_mode = (current_sub1_mode - 1 + max_sub1_modes) % max_sub1_modes;
-        } else if (currentStateChange(MENU_PIN)) {
-            if (current_sub1_mode == 0) {
-                calibrateXAxis();
-            } else if (current_sub1_mode == 1) {
-                calibrateZAxis();
-            } else {
-                break;
-            }
-        }
-    }
-}
-
-void navigateSub2Menu() {
-    int current_sub2_mode = 0;
-    const int max_sub2_modes = 5;
-    while (1) {
-        lcd.clear();
-        lcd.print(sub2_options[current_sub2_mode]);
-        _delay_ms(100);
-
-        if (currentStateChange(UP_PIN)) {
-            current_sub2_mode = (current_sub2_mode + 1) % max_sub2_modes;
-        } else if (currentStateChange(DOWN_PIN)) {
-            current_sub2_mode = (current_sub2_mode - 1 + max_sub2_modes) % max_sub2_modes;
-        } else if (currentStateChange(MENU_PIN)) {
-            if (current_sub2_mode == 0) {
-                setSpeed(1);
-            } else if (current_sub2_mode == 1) {
-                setSpeed(2);
-            } else if (current_sub2_mode == 2) {
-                setSpeed(3);
-            } else if (current_sub2_mode == 3) {
-                setSpeed(4);
-            } else {
-                break;
-            }
-        }
-    }
-}
-
-void calibrateXAxis() {
+void setSpeedMode() {
     lcd.clear();
-    lcd.print("Calibrating X Axis");
-    _delay_ms(2000);
-    savePositionToEEPROM(eepromAddr_stepper1, savedPosition1);
+    lcd.print("Set Speed");
+    // Code to adjust motor speeds
+    // ...
+    stepper1.setSpeed(new_speed1);
+    stepper2.setSpeed(new_speed2);
+    stepper3.setSpeed(new_speed3);
+    stepper4.setSpeed(new_speed4);
 }
+Number of Holes
+Set the number of holes for the pick and place operation:
 
-void calibrateZAxis() {
+c
+Copy code
+void numberOfHolesMode() {
     lcd.clear();
-    lcd.print("Calibrating Z Axis");
-    _delay_ms(2000);
-    savePositionToEEPROM(eepromAddr_stepper2, savedPosition2);
-}
-
-void setSpeed(int stepper) {
-    lcd.clear();
-    lcd.print("Setting Speed for Stepper ");
-    lcd.print(stepper);
-    _delay_ms(2000);
-}
-
-void setNumberOfHoles() {
-    lcd.clear();
-    lcd.print("Setting Number of Holes");
-    _delay_ms(2000);
+    lcd.print("Number of Holes");
+    // Code to set the number of holes
+    // ...
+    numberOfHoles = new_number;
 }
 ```
+### Execute Operation
+Highlight the main execution operation including acceleration, constant speed, and deceleration for the stepper motors:
 
-### Conclusion
-This project demonstrates the basics of a pick-and-place robot arm using an ATmega328P microcontroller. The robot arm can be calibrated, and its speed can be set through an LCD interface and push buttons.
+```c
 
-### License
-This project is licensed under the MIT License.
+void executeOperation() {
+    lcd.clear();
+    lcd.print("Executing...");
+
+    for (int i = 0; i < numberOfHoles; i++) {
+        // Move to initial position
+        moveToPosition(initial_position);
+
+        // Pick operation
+        operateGripper(OPEN);
+        delay(1000); // Wait for gripper to open
+
+        // Move to pick position
+        moveToPosition(pick_position);
+        operateGripper(CLOSE);
+        delay(1000); // Wait for gripper to close
+
+        // Move to place position
+        moveToPosition(place_position);
+        operateGripper(OPEN);
+        delay(1000); // Wait for gripper to open
+
+        // Move back to initial position
+        moveToPosition(initial_position);
+    }
+
+    lcd.clear();
+    lcd.print("Done");
+}
+```
+### Acceleration, Constant Speed, and Deceleration
+To control the stepper motors with acceleration, constant speed, and deceleration:
+
+```c
+
+void moveToPosition(Position pos) {
+    // Example function to move stepper1
+    int steps = calculateSteps(current_position, pos);
+    
+    // Accelerate
+    for (int i = 0; i < acceleration_steps; i++) {
+        stepper1.setSpeed(min_speed + i * (max_speed - min_speed) / acceleration_steps);
+        stepper1.step(1);
+    }
+
+    // Constant speed
+    for (int i = 0; i < steps - (acceleration_steps + deceleration_steps); i++) {
+        stepper1.setSpeed(max_speed);
+        stepper1.step(1);
+    }
+
+    // Decelerate
+    for (int i = 0; i < deceleration_steps; i++) {
+        stepper1.setSpeed(max_speed - i * (max_speed - min_speed) / deceleration_steps);
+        stepper1.step(1);
+    }
+
+    current_position = pos;
+}
+
+```
+
+
 
