@@ -83,159 +83,63 @@ Set Speed and Number of Holes: Adjust the speed of the motors and set the number
 Execute Operation: Once settings are configured, select "Continue" from the main menu to start the pick and place operation.
 
 ## Code Explanation
+## Functions
 
-### Initialization
-In the `setup()` function, initialize the LCD, buttons, and stepper motors:
+### execute_operation
 
-```c
-void setup() {
-    // Initialize LCD
-    lcd.begin(16, 2);
-    lcd.print("Initializing...");
+Coordinates the sequence of movements for the robot arm:
 
-    // Initialize buttons
-    pinMode(BUTTON1_PIN, INPUT_PULLUP);
-    pinMode(BUTTON2_PIN, INPUT_PULLUP);
-    pinMode(BUTTON3_PIN, INPUT_PULLUP);
-    pinMode(BUTTON4_PIN, INPUT_PULLUP);
+1. Moves the arm horizontally by 40 cm.
+2. Moves the arm vertically by 30 cm.
+3. Repeats movements to pick and place items, rotating the arm between actions.
+4. Continues until an immediate action is triggered.
 
-    // Initialize stepper motors
-    stepper1.setSpeed(initial_speed);
-    stepper2.setSpeed(initial_speed);
-    stepper3.setSpeed(initial_speed);
-    stepper4.setSpeed(initial_speed);
+### step_motor
 
-    lcd.clear();
-    lcd.print("Ready");
-}
-```
-### Menu Navigation
-Implement the menu navigation using button inputs to select various options:
+Handles stepper motor movement with acceleration and deceleration:
 
 ```c
+void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
+    if (immediate()) {
+        save_positions();  // Save current positions
+        runloop = 0;       // Exit the loop
+        return;
+    }
 
-void loop() {
-    if (digitalRead(BUTTON1_PIN) == LOW) {
-        // Navigate to Calibration Mode
-        calibrationMode();
-    } else if (digitalRead(BUTTON2_PIN) == LOW) {
-        // Navigate to Set Speed Mode
-        setSpeedMode();
-    } else if (digitalRead(BUTTON3_PIN) == LOW) {
-        // Navigate to Number of Holes
-        numberOfHolesMode();
-    } else if (digitalRead(BUTTON4_PIN) == LOW) {
-        // Execute Operation
-        executeOperation();
+    // Set direction
+    if (direction) {
+        *dir_port |= (1 << dir_pin);
+    } else {
+        *dir_port &= ~(1 << dir_pin);
+    }
+
+    // Calculate the number of steps for each phase
+    uint16_t accel_steps = MAX_SPEED / ACCEL_RATE;
+    uint16_t decel_steps = MAX_SPEED / DECEL_RATE;
+    uint16_t constant_steps = steps - (accel_steps + decel_steps);
+
+    // Acceleration phase
+    for (uint16_t i = 0; i < accel_steps; i++) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+    }
+
+    // Constant speed phase
+    for (uint16_t i = 0; i < constant_steps; i++) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / MAX_SPEED);
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / MAX_SPEED);
+    }
+
+    // Deceleration phase
+    for (uint16_t i = decel_steps; i > 0; i--) {
+        *step_port |= (1 << step_pin);
+        _delay_us(1000000 / (DECEL_RATE * i + 1));
+        *step_port &= ~(1 << step_pin);
+        _delay_us(1000000 / (DECEL_RATE * i + 1));
     }
 }
 ```
-### Calibration Mode
-Allow the user to manually control each motor to set the initial positions:
-
-```c
-
-void calibrationMode() {
-    lcd.clear();
-    lcd.print("Calibration Mode");
-    // Code to manually control motors
-    // ...
-}
-```
-### Set Speed
-Set the speed for each stepper motor:
-
-```c
-
-void setSpeedMode() {
-    lcd.clear();
-    lcd.print("Set Speed");
-    // Code to adjust motor speeds
-    // ...
-    stepper1.setSpeed(new_speed1);
-    stepper2.setSpeed(new_speed2);
-    stepper3.setSpeed(new_speed3);
-    stepper4.setSpeed(new_speed4);
-}
-Number of Holes
-Set the number of holes for the pick and place operation:
-
-c
-Copy code
-void numberOfHolesMode() {
-    lcd.clear();
-    lcd.print("Number of Holes");
-    // Code to set the number of holes
-    // ...
-    numberOfHoles = new_number;
-}
-```
-### Execute Operation
-Highlight the main execution operation including acceleration, constant speed, and deceleration for the stepper motors:
-
-```c
-
-void executeOperation() {
-    lcd.clear();
-    lcd.print("Executing...");
-
-    for (int i = 0; i < numberOfHoles; i++) {
-        // Move to initial position
-        moveToPosition(initial_position);
-
-        // Pick operation
-        operateGripper(OPEN);
-        delay(1000); // Wait for gripper to open
-
-        // Move to pick position
-        moveToPosition(pick_position);
-        operateGripper(CLOSE);
-        delay(1000); // Wait for gripper to close
-
-        // Move to place position
-        moveToPosition(place_position);
-        operateGripper(OPEN);
-        delay(1000); // Wait for gripper to open
-
-        // Move back to initial position
-        moveToPosition(initial_position);
-    }
-
-    lcd.clear();
-    lcd.print("Done");
-}
-```
-### Acceleration, Constant Speed, and Deceleration
-To control the stepper motors with acceleration, constant speed, and deceleration:
-
-```c
-
-void moveToPosition(Position pos) {
-    // Example function to move stepper1
-    int steps = calculateSteps(current_position, pos);
-    
-    // Accelerate
-    for (int i = 0; i < acceleration_steps; i++) {
-        stepper1.setSpeed(min_speed + i * (max_speed - min_speed) / acceleration_steps);
-        stepper1.step(1);
-    }
-
-    // Constant speed
-    for (int i = 0; i < steps - (acceleration_steps + deceleration_steps); i++) {
-        stepper1.setSpeed(max_speed);
-        stepper1.step(1);
-    }
-
-    // Decelerate
-    for (int i = 0; i < deceleration_steps; i++) {
-        stepper1.setSpeed(max_speed - i * (max_speed - min_speed) / deceleration_steps);
-        stepper1.step(1);
-    }
-
-    current_position = pos;
-}
-
-```
-
-
-
