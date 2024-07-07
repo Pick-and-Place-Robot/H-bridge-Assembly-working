@@ -4,9 +4,9 @@
 #include <avr/eeprom.h>
 
 // Define the parameters
-#define MAX_SPEED  33  //200   // Maximum speed (steps per second)
-#define ACCEL_RATE 10   // Acceleration rate (steps per second^2)
-#define DECEL_RATE 10   // Deceleration rate (steps per second^2)
+#define MAX_SPEED  33  // Maximum speed (mm per second)
+#define ACCEL_RATE 10   // Acceleration rate (mm s^-2)
+#define DECEL_RATE 10   // Deceleration rate (mm s^-2)
 
 // Define F_CPU for _delay_ms()
 #define F_CPU 16000000UL
@@ -60,8 +60,8 @@ int16_t default_holes = 6;
 
 int16_t temp_speed1 = 0;
 int16_t temp_speed2 = 0;
-int16_t temp_speed3 = 10;
-int16_t temp_speed4 = 10;
+int16_t temp_speed3 = 0;
+int16_t temp_speed4 = 0;
 int16_t temp_x_coordinate = 0;
 int16_t temp_z_coordinate = 0;
 int16_t temp_holes = 0;
@@ -239,34 +239,37 @@ void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t 
     }
      
     int MAX_STEP_SPEED =MAX_SPEED*200/2
+    int ACCEL_RATE_STEP =ACCEL_RATE*200/2
+    int DECEL_RATE_STEP =DECEL_RATE*200/2
+    
 
     // Calculate the number of steps for each phase
-    uint16_t accel_steps = MAX_SPEED / ACCEL_RATE;
-    uint16_t decel_steps = MAX_SPEED / DECEL_RATE;
+    uint16_t accel_steps = MAX_STEP_SPEED / ACCEL_RATE_STEP;
+    uint16_t decel_steps = MAX_STEP_SPEED / DECEL_RATE_STEP;
     uint16_t constant_steps = steps - (accel_steps + decel_steps);
 
     // Acceleration phase
     for (uint16_t i = 0; i < accel_steps; i++) {
         *step_port |= (1 << step_pin);
-        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+        _delay_us(1000000 / (ACCEL_RATE_STEP * i + 1));
         *step_port &= ~(1 << step_pin);
-        _delay_us(1000000 / (ACCEL_RATE * i + 1));
+        _delay_us(1000000 / (ACCEL_RATE_STEP * i + 1));
     }
 
     // Constant speed phase
     for (uint16_t i = 0; i < constant_steps; i++) {
         *step_port |= (1 << step_pin);
-        _delay_us(1000000 / MAX_SPEED);
+        _delay_us(1000000 / MAX_STEP_SPEED);
         *step_port &= ~(1 << step_pin);
-        _delay_us(1000000 / MAX_SPEED);
+        _delay_us(1000000 / MAX_STEP_SPEED);
     }
 
     // Deceleration phase
     for (uint16_t i = decel_steps; i > 0; i--) {
         *step_port |= (1 << step_pin);
-        _delay_us(1000000 / (DECEL_RATE * i + 1));
+        _delay_us(1000000 / (DECEL_RATE_STEP * i + 1));
         *step_port &= ~(1 << step_pin);
-        _delay_us(1000000 / (DECEL_RATE * i + 1));
+        _delay_us(1000000 / (DECEL_RATE_STEP * i + 1));
     }
 }
 
@@ -629,10 +632,7 @@ int main() {
     initializeMotorPins();   // Initialize direction and step pins as output
     setupLCD();              // Initialize LCD
     setupButtonPins();       // Initialize buttons
-
     initializeMotorPositions();  // Initialize motor positions from EEPROM
-
     loop();     // Execute the main operation
-
     return 0;
 }
