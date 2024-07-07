@@ -179,13 +179,13 @@ void loop() {
 }
 
 
-void stepper_to_horizontal(int distance_cm) {
-    // Calculate steps based on distance (convert cm to steps)
-    // 360 degrees of rotation corresponds to 2 cm of linear distance
-    float distance_per_rotation_cm = 2.0; 
-    float steps_per_cm = 200.0;  // full step mode
+void stepper_to_horizontal(int distance_mm) {
+    // Calculate steps based on distance (convert mm to steps)
+    // 360 degrees of rotation corresponds to 2 mm of linear distance
+    float distance_per_rotation_mm = 2.0; 
+    float steps_per_rotation = 200.0;  // full step mode
     
-    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
+    int steps = distance_mm * steps_per_mm / distance_per_rotation_mm;
 
     // Move the motor
     step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, steps, 1);
@@ -194,12 +194,12 @@ void stepper_to_horizontal(int distance_cm) {
 
 // Function to move stepper motor 2 vertically
 void stepper_to_vertical(int distance) {
-    /// Calculate steps based on distance (convert cm to steps)
-    // 360 degrees of rotation corresponds to 2 cm of linear distance
-    float distance_per_rotation_cm = 2.0; 
-    float steps_per_cm = 200.0;  // full step mode
+    /// Calculate steps based on distance (convert mm to steps)
+    // 360 degrees of rotation corresponds to 2 mm of linear distance
+    float distance_per_rotation_mm = 2.0; 
+    float steps_per_mm = 200.0;  // full step mode
     
-    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
+    int steps = distance_mm * steps_per_mm / distance_per_rotation_mm;
     step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, steps, 1);
 }
 
@@ -214,12 +214,12 @@ void stepper_to_rotation(int angle) {
 
 // Function to move stepper motor 4 for fingers or gripper movement
 void stepper_to_fingers(int distance) {
-     /// Calculate steps based on distance (convert cm to steps)
-    // 360 degrees of rotation corresponds to 2 cm of linear distance
-    float distance_per_rotation_cm = 1.0; 
-    float steps_per_cm = 200.0;  // full step mode
+     /// Calculate steps based on distance (convert mm to steps)
+    // 360 degrees of rotation corresponds to 2 mm of linear distance
+    float distance_per_rotation_mm = 1.0; 
+    float steps_per_mm = 200.0;  // full step mode
     
-    int steps = distance_cm * steps_per_cm / distance_per_rotation_cm;
+    int steps = distance_mm * steps_per_mm / distance_per_rotation_mm;
     step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, steps, 1);
 }
 
@@ -271,35 +271,35 @@ void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t 
 
 void execute_operation() {
     
-    stepper_to_horizontal(40);  // Move stepper 1 horizontally by 40 cm
-    stepper_to_vertical(30);    // Move stepper 2 vertically by 30cm
+    stepper_to_horizontal(400);  // Move stepper 1 horizontally by 400 mm
+    stepper_to_vertical(300);    // Move stepper 2 vertically by 300 mm
     
     while (runloop) {
         // Execute the sequence of movements
-        stepper_to_fingers(5);
+        stepper_to_fingers(50);
         _delay_ms(1000); 
-        stepper_to_horizontal(-5);
+        stepper_to_horizontal(-50);
         _delay_ms(1000); 
-        stepper_to_vertical(-10);
+        stepper_to_vertical(-100);
         _delay_ms(1000); 
 
-        stepper_to_horizontal(5);
+        stepper_to_horizontal(50);
         _delay_ms(1000); 
         for (int i=0,I<holes,i++){
-            stepper_to_rotation(30); 
+            stepper_to_rotation(60); //finger roatate by 60 degree
             _delay_ms(2000); 
         }
-        stepper_to_horizontal(-5);
+        stepper_to_horizontal(-50);
         _delay_ms(1000); 
 
-        stepper_to_vertical(20);
+        stepper_to_vertical(200);
         _delay_ms(1000); 
-        stepper_to_horizontal(5);
+        stepper_to_horizontal(50);
         _delay_ms(1000); 
-        stepper_to_fingers(-5);
+        stepper_to_fingers(-50);
         _delay_ms(1000); 
 
-        stepper_to_vertical(-10);
+        stepper_to_vertical(-100);
 
         _delay_ms(5000);  // Wait for 5 seconds 
     }
