@@ -5,8 +5,8 @@
 
 // Define the parameters
 #define MAX_SPEED  33  // Maximum speed (mm per second)
-#define ACCEL_RATE 10   // Acceleration rate (mm s^-2)
-#define DECEL_RATE 10   // Deceleration rate (mm s^-2)
+#define ACCEL_RATE 10   // Acceleration rate (mm per second^2)
+#define DECEL_RATE 10   // Deceleration rate (mm per second^2)
 
 // Define F_CPU for _delay_ms()
 #define F_CPU 16000000UL
