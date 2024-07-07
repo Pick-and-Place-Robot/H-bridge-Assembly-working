@@ -153,20 +153,6 @@ void displayMainMenu() {
     lcd_print(options_main[current_main_mode]);
 }
 
-void navigateMenu();
-void execute_operation();
-bool currentStateChange(uint8_t pin);
-void savePositionToEEPROM(uint16_t addr, int16_t value);
-int16_t readPositionFromEEPROM(uint16_t addr);
-void navigateSub1Menu();
-void navigateSub2Menu();
-void calibrateXAxis();
-void calibrateZAxis();
-void setSpeed(int stepper);
-void setNumberOfHoles();
-void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction);
-bool immediate();
-
 void loop() {
     while (1) {
         displayMainMenu();
@@ -186,47 +172,64 @@ void loop() {
     }
 }
 
+
+void stepper_to_horizontal(int distance) {
+    // Calculate steps based on distance (convert cm to steps)
+    int steps = distance;  // Replace with your conversion formula
+
+    // Move the motor
+    step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, steps, 1);
+}
+
+// Function to move stepper motor 2 vertically
+void stepper_to_vertical(int distance) {
+    // Calculate steps based on distance (convert cm to steps)
+    int steps = distance;  // Replace with your conversion formula
+
+    // Move the motor
+    step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, steps, 1);
+}
+
+// Function to rotate stepper motor 3 by a specified angle
+void stepper_to_rotation(int angle) {
+    // Calculate steps based on angle (convert degrees to steps)
+    int steps = angle;  // Replace with your conversion formula
+
+    // Move the motor
+    step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, steps, 1);
+}
+
+// Function to move stepper motor 4 for fingers or gripper movement
+void stepper_to_fingers(int distance) {
+    // Calculate steps based on distance (convert cm to steps)
+    int steps = distance;  // Replace with your conversion formula
+
+    // Move the motor
+    step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, steps, 1);
+}
+
+
 void execute_operation() {
     int runloop = 1;
 
     while (runloop) {
-        // Move to positions
-        step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 1);  // Move 2000 steps forward
-        step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 1);
-        step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 1);
-        step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 1);
+        // Execute the sequence of movements
+        stepper_to_horizontal(2000);  // Move stepper 1 horizontally by 2000 steps
+        stepper_to_vertical(1000);    // Move stepper 2 vertically by 1000 steps
+        stepper_to_rotation(360);     // Rotate stepper 3 by 360 degrees (or steps)
+        stepper_to_fingers(500);      // Move stepper 4 for fingers/gripper by 500 steps
 
-        // Wait until movement is complete or immediate button is pressed
-        while (runloop) {
-            if (immediate()) {
-                save_positions();
-                runloop = 0;
-                break;
-            }
+        // Check if immediate action is required
+        if (immediate()) {
+            save_positions();  // Save current positions
+            runloop = 0;       // Exit the loop
+            break;
         }
 
-        
-        _delay_ms(2000);
-
-        // Move back to zero
-        step_motor(&STEP1_PORT, STEP1_PIN, &DIR1_PORT, DIR1_PIN, 2000, 0);  // Move 2000 steps backward
-        step_motor(&STEP2_PORT, STEP2_PIN, &DIR2_PORT, DIR2_PIN, 2000, 0);
-        step_motor(&STEP3_PORT, STEP3_PIN, &DIR3_PORT, DIR3_PIN, 200, 0);
-        step_motor(&STEP4_PORT, STEP4_PIN, &DIR4_PORT, DIR4_PIN, 20, 0);
-
-        // Wait until movement is complete or immediate button is pressed
-        while (runloop) {
-            if (immediate()) {
-                save_positions();
-                runloop = 0;
-                break;
-            }
-        }
-
-        
-        _delay_ms(2000);
+        _delay_ms(2000);  // Wait for 2 seconds before repeating the loop
     }
 }
+
 
 // Helper Functions
 bool currentStateChange(uint8_t pin) {
@@ -346,8 +349,33 @@ void calibrateXAxis() {
     lcd_print("Calibrating X Axis");
     _delay_ms(1000);
 
-    // Implement calibration logic here
+    lcd_command(0x01); // Clear display
+    lcd_print("Enter X value:");
+    _delay_ms(2000);
+
+    while (!currentStateChange(CANCEL_PIN)) {
+        lcd_command(0x01); // Clear display
+        char buffer[16];
+        sprintf(buffer, "X value: %d", temp_x_coordinate);
+        lcd_print(buffer);
+
+        if (currentStateChange(UP_PIN)) {
+            temp_x_coordinate++;
+            _delay_ms(200);
+        } else if (currentStateChange(DOWN_PIN)) {
+            temp_x_coordinate--;
+            _delay_ms(200);
+        } else if (currentStateChange(MENU_PIN)) {
+            lcd_command(0x01); // Clear display
+            lcd_print("X coordinate done");
+            initial_x_coordinate = temp_x_coordinate;
+            _delay_ms(2000);
+            break;
+        }
+    }
 }
+
+
 
 void calibrateZAxis() {
     // Calibration for Z Axis
@@ -355,8 +383,32 @@ void calibrateZAxis() {
     lcd_print("Calibrating Z Axis");
     _delay_ms(1000);
 
-    // Implement calibration logic here
+    lcd_command(0x01); // Clear display
+    lcd_print("Enter Z value:");
+    _delay_ms(2000);
+
+    while (!currentStateChange(CANCEL_PIN)) {
+        lcd_command(0x01); // Clear display
+        char buffer[16];
+        sprintf(buffer, "Z value: %d", temp_z_coordinate);
+        lcd_print(buffer);
+
+        if (currentStateChange(UP_PIN)) {
+            temp_z_coordinate++;
+            _delay_ms(200);
+        } else if (currentStateChange(DOWN_PIN)) {
+            temp_z_coordinate--;
+            _delay_ms(200);
+        } else if (currentStateChange(MENU_PIN)) {
+            lcd_command(0x01); // Clear display
+            lcd_print("Z coordinate done");
+            initial_z_coordinate = temp_z_coordinate;
+            _delay_ms(2000);
+            break;
+        }
+    }
 }
+
 
 void setSpeed(int stepper) {
     // Set Speed for a stepper motor
@@ -364,8 +416,78 @@ void setSpeed(int stepper) {
     lcd_print("Set Speed");
     _delay_ms(1000);
 
-    // Implement speed setting logic here
+    while (!currentStateChange(CANCEL_PIN)) {
+        lcd_command(0x01); // Clear display
+        lcd_print(sub2_options[current_2_submode]);
+
+        if (currentStateChange(UP_PIN)) {
+            _delay_ms(200);
+            current_2_submode = (current_2_submode + 1) % max_2_submodes;
+        } else if (currentStateChange(DOWN_PIN)) {
+            _delay_ms(200);
+            current_2_submode = (current_2_submode - 1 + max_2_submodes) % max_2_submodes;
+        } else if (currentStateChange(MENU_PIN)) {
+            _delay_ms(200);
+            if (current_2_submode >= 0 && current_2_submode <= 3) {
+                setStepperSpeed(current_2_submode + 1);
+            } else if (current_2_submode == 4) {
+                break;
+            }
+        }
+    }
 }
+
+void setStepperSpeed(int stepperNumber) {
+    char buffer[16];
+    int* temp_speed;
+    int* initial_speed;
+
+    switch (stepperNumber) {
+        case 1:
+            temp_speed = &temp_speed1;
+            initial_speed = &initial_speed1;
+            break;
+        case 2:
+            temp_speed = &temp_speed2;
+            initial_speed = &initial_speed2;
+            break;
+        case 3:
+            temp_speed = &temp_speed3;
+            initial_speed = &initial_speed3;
+            break;
+        case 4:
+            temp_speed = &temp_speed4;
+            initial_speed = &initial_speed4;
+            break;
+    }
+
+    lcd_command(0x01); // Clear display
+    sprintf(buffer, "Enter speed%d value:", stepperNumber);
+    lcd_print(buffer);
+    _delay_ms(2000);
+
+    while (!currentStateChange(CANCEL_PIN)) {
+        lcd_command(0x01); // Clear display
+        sprintf(buffer, "speed%d value: %d", stepperNumber, *temp_speed);
+        lcd_print(buffer);
+
+        if (currentStateChange(UP_PIN)) {
+            (*temp_speed)++;
+            _delay_ms(200);
+        } else if (currentStateChange(DOWN_PIN)) {
+            (*temp_speed)--;
+            _delay_ms(200);
+        } else if (currentStateChange(MENU_PIN)) {
+            lcd_command(0x01); // Clear display
+            sprintf(buffer, "speed%d value done", stepperNumber);
+            lcd_print(buffer);
+            *initial_speed = *temp_speed;
+            _delay_ms(2000);
+            break;
+        }
+    }
+}
+
 
 void setNumberOfHoles() {
     // Set Number of Holes
@@ -373,8 +495,32 @@ void setNumberOfHoles() {
     lcd_print("Set Number of Holes");
     _delay_ms(1000);
 
-    // Implement number of holes setting logic here
+    lcd_command(0x01); // Clear display
+    lcd_print("Enter number of holes:");
+    _delay_ms(2000);
+
+    while (!currentStateChange(CANCEL_PIN)) {
+        lcd_command(0x01); // Clear display
+        char buffer[16];
+        sprintf(buffer, "holes value: %d", temp_holes);
+        lcd_print(buffer);
+
+        if (currentStateChange(UP_PIN)) {
+            temp_holes++;
+            _delay_ms(200);
+        } else if (currentStateChange(DOWN_PIN)) {
+            temp_holes--;
+            _delay_ms(200);
+        } else if (currentStateChange(MENU_PIN)) {
+            lcd_command(0x01); // Clear display
+            lcd_print("holes value done");
+            default_holes = temp_holes;
+            _delay_ms(2000);
+            break;
+        }
+    }
 }
+
 
 void step_motor(volatile uint8_t *step_port, uint8_t step_pin, volatile uint8_t *dir_port, uint8_t dir_pin, uint16_t steps, uint8_t direction) {
     // Set direction
@@ -405,25 +551,28 @@ void save_positions() {
     savePositionToEEPROM(eepromAddr_stepper4, savedPosition4);
 }
 
-int main() {
+void initializeMotorPins() {
     // Set direction and step pins as output
     DDRD |= (1 << DIR1_PIN) | (1 << STEP1_PIN) | (1 << DIR2_PIN) | (1 << STEP2_PIN) | (1 << DIR3_PIN) | (1 << STEP3_PIN);
     DDRB |= (1 << DIR4_PIN) | (1 << STEP4_PIN);
+}
 
-    // Initialize LCD and buttons
-    setupLCD();
-    setupButtonPins();
-
+void initializeMotorPositions() {
     // Initialize motor positions from EEPROM
     savedPosition1 = readPositionFromEEPROM(eepromAddr_stepper1);
     savedPosition2 = readPositionFromEEPROM(eepromAddr_stepper2);
     savedPosition3 = readPositionFromEEPROM(eepromAddr_stepper3);
     savedPosition4 = readPositionFromEEPROM(eepromAddr_stepper4);
+}
 
-    sei();  // Enable global interrupts
+int main() {
+    initializeMotorPins();   // Initialize direction and step pins as output
+    setupLCD();              // Initialize LCD
+    setupButtonPins();       // Initialize buttons
 
-    // Main loop
-    loop();
+    initializeMotorPositions();  // Initialize motor positions from EEPROM
+
+    loop();     // Execute the main operation
 
     return 0;
 }
